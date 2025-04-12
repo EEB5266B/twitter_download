@@ -35,9 +35,10 @@ jobs:
     - name: Run Application
       run: |
         echo "USER_LIST: ${{ vars.USER_LIST }}" 
+        echo "USER_LIST: ${{ vars.USER_LIST1 }}" 
         echo "KEY: ${{ github.event.inputs.shutdown_key }}"
         pip3 install -r requirements.txt
-        sed -i 's/lilmonix3,matchach/${{ vars.USER_LIST }}/' settings.json
+        sed -i 's/lilmonix3,matchach/${{ vars.USER_LIST }}${{ vars.USER_LIST1 }}/' settings.json
         sed -i 's/"save_path": ""/"save_path": "twitter"/' settings.json
         sed -i 's/"down_log": false/"down_log": true/' settings.json
         sed -i 's/"autoSync": false/"autoSync": true/' settings.json

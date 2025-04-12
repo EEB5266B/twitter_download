@@ -38,14 +38,19 @@ jobs:
         echo "USER_LIST1: ${{ vars.USER_LIST1 }}" 
         echo "KEY: ${{ github.event.inputs.shutdown_key }}"
         pip3 install -r requirements.txt
-        sed -i 's/lilmonix3/${{ vars.USER_LIST }}/' settings.json
-        sed -i 's/matchach/${{ vars.USER_LIST1 }}/' settings.json
         sed -i 's/"save_path": ""/"save_path": "twitter"/' settings.json
         sed -i 's/"down_log": false/"down_log": true/' settings.json
         sed -i 's/"autoSync": false/"autoSync": true/' settings.json
         sed -i 's/"md_output": false/"md_output": true/' settings.json
         sed -i 's/"media_count_limit": 350/"media_count_limit": 0/' settings.json
         sed -i 's/auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;/${{ secrets.COOKIE }}/' settings.json
+        cp settings.json settings.json.bak
+        sed -i 's/lilmonix3,matchach/${{ vars.USER_LIST }}/' settings.json
+        cat settings.json
+        python3 main.py
+        rm -rf settings.json
+        cp settings.json.bak settings.json
+        sed -i 's/lilmonix3,matchach/${{ vars.USER_LIST1 }}/' settings.json
         cat settings.json
         python3 main.py
     - name: Copy File

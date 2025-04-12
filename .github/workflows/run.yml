@@ -44,6 +44,7 @@ jobs:
         sed -i 's/"md_output": false/"md_output": true/' settings.json
         sed -i 's/"media_count_limit": 350/"media_count_limit": 0/' settings.json
         sed -i 's/auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;/${{ secrets.COOKIE }}/' settings.json
+        cat settings.json
         python3 main.py
     - name: Copy File
       uses: appleboy/scp-action@v0.1.7

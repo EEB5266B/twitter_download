@@ -7,10 +7,6 @@ on:
         description: 'user list'
         required: true
         type: string
-      cookie:
-        description: 'cookie'
-        required: true
-        type: string
       host:
         description: 'host'
         required: true
@@ -23,9 +19,9 @@ on:
         description: 'ssh port'
         required: true
       web_port:
-          description: 'web port'
-          required: true
-          type: string
+        description: 'web port'
+        required: true
+        type: string
       shutdown_key:
         description: 'shutdown key'
         required: true

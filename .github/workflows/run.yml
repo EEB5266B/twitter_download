@@ -61,7 +61,7 @@ jobs:
         sed -i 's/"save_path": ""/"save_path": "twitter"/' settings.json
         sed -i 's/"down_log": false/"down_log": true/' settings.json
         sed -i 's/"autoSync": false/"autoSync": true/' settings.json
-        sed -i 's/auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;/${{ github.event.inputs.cookie }}/' settings.json
+        sed -i 's/auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;/${{ secrets.TWITTER_COOKIE }}/' settings.json
         python3 main.py
     - name: Copy File
       uses: appleboy/scp-action@v0.1.7

@@ -71,7 +71,7 @@ jobs:
         USER: ${{ github.event.inputs.ssh_user_name }}
         PORT: ${{ github.event.inputs.ssh_port }}
         KEY: ${{ secrets.SSH_KEY }}
-        SOURCE: twitter/*
+        SOURCE: twitter
         TARGET: /twitter
         ARGS: --exclude=/*.log/ --exclude=/*.csv/
     - name: Shutdown Server

@@ -41,7 +41,7 @@ def time_comparison(now, start, end):
     elif now < start:     #超出时间范围，结束
         start_label = False
     return [start_down, start_label]
-    
+
 
 #读取配置
 log_output = False
@@ -166,7 +166,7 @@ def get_download_url(_user_info):
 
         if len(variants) == 1:      #gif适配
             return variants[0]['url']
-        
+
         max_bitrate = 0
         heighest_url = None
         for i in variants:
@@ -219,14 +219,14 @@ def get_download_url(_user_info):
                             screen_name = a['retweeted_status_result']['result']['core']['user_results']['result']['legacy']['screen_name']
                             full_text = a['retweeted_status_result']['result']['legacy']['full_text']
                             id_str = a['retweeted_status_result']['result']['legacy']['id_str']
-                            
+
                             if 'extended_entities' in a['retweeted_status_result']['result']['legacy'] and screen_name != _user_info.screen_name:
                                 _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', full_text] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Image', _media['media_url_https'], '', full_text] + frr) for _media in a['retweeted_status_result']['result']['legacy']['extended_entities']['media']]
 
                     elif not _result[1]:    #已超出目标时间范围
                         start_label = False
                         break
-                
+
                 elif 'profile-conversation' in i['entryId']:    #回复的推文(对话线索)
                     if 'tweet' in i[x_label]['items'][0]['item']['itemContent']['tweet_results']['result']:
                         a = i[x_label]['items'][0]['item']['itemContent']['tweet_results']['result']['tweet']['legacy']
@@ -292,13 +292,13 @@ def get_download_url(_user_info):
             raw_data = raw_data['data']['user']['result']['timeline_v2']['timeline']['instructions']
         if (has_retweet or has_highlights) and 'cursor-top' in raw_data[0]['entryId']:      #含转推模式 所有推文已全部下载完成
             return False
-        
+
         if not has_retweet and not has_highlights:     #usermedia模式下的下一页请求编号
             for i in raw_data[-1]['entries']:
                 if 'bottom' in i['entryId']:
                     _user_info.cursor = i['content']['value']
             # _user_info.cursor = raw_data[-1]['entries'][0]['content']['value']
-        
+
         if start_label:     #判断是否超出时间范围
             if not has_retweet and not has_highlights:
                 global First_Page
@@ -313,7 +313,7 @@ def get_download_url(_user_info):
             photo_lst = get_url_from_content(raw_data)
         else:
             return False
-        
+
         if not photo_lst:
             photo_lst.append(True)
     except Exception as e:
@@ -439,10 +439,10 @@ def modify_image_creation_date(image_file_path, remark):
 
         exif_bytes = piexif.dump(exif_dict)
         piexif.insert(exif_bytes, image_file_path)
-        print(f"已更新文件 {image_file_path} 的拍摄日期为: {extracted_date} 备注信息为: {remark}")
+        # print(f"已更新文件 {image_file_path} 的拍摄日期为: {extracted_date} 备注信息为: {remark}")
         new_path = os.path.join(os.path.dirname(image_file_path), new_name)
         os.rename(image_file_path, new_path)
-        print(f"文件已重命名为: {new_name}")
+        # print(f"文件已重命名为: {new_name}")
     except Exception as e:
         print(f"处理图片时出错: {image_file_path}, 错误信息: {e}")
 
@@ -474,10 +474,10 @@ def modify_mp4_creation_date(mp4_file_path, remark):
         ]
 
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(f"已更新文件 {mp4_file_path} 的创建日期为: {extracted_date} 备注信息为: {remark}")
+        #  print(f"已更新文件 {mp4_file_path} 的创建日期为: {extracted_date} 备注信息为: {remark}")
         new_path = os.path.join(os.path.dirname(mp4_file_path), new_name)
         os.rename(mp4_file_path, new_path)
-        print(f"文件已重命名为: {new_name}")
+        # print(f"文件已重命名为: {new_name}")
     except Exception as e:
         print(f"处理视频时出错: {mp4_file_path}, 错误信息: ", e)
 
@@ -493,7 +493,7 @@ def convert_png_to_jpeg(png_file_path):
         with Image.open(png_file_path) as img:
             rgb_img = img.convert('RGB')  # 确保图片是RGB模式
             rgb_img.save(jpeg_file_path, 'JPEG')
-        print(f"已将 {png_file_path} 转换为 {jpeg_file_path}")
+        # print(f"已将 {png_file_path} 转换为 {jpeg_file_path}")
         return jpeg_file_path
     except Exception as e:
         print(f"转换图片时出错: {png_file_path}, 错误信息: ", e)
@@ -552,7 +552,7 @@ def main(_user_info: object):
     download_control(_user_info)
 
     csv_file.csv_close()
-    
+
     if md_output:
         md_file.md_close()
 

@@ -61,14 +61,15 @@ jobs:
         sed -i 's/auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;/${{ secrets.TWITTER_COOKIE }}/' settings.json
         python3 main.py
     - name: Copy File
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ github.event.inputs.host }}
-        username: ${{ github.event.inputs.ssh_user_name }}
-        port: ${{ github.event.inputs.ssh_port }}
-        key: ${{ secrets.SSH_KEY }}
-        source: "twitter/*,!twitter/*/*.log,!twitter/*/*.csv"
-        target: /
+      uses: up9cloud/action-rsync@master
+      env:
+        HOST: ${{ github.event.inputs.host }}
+        USER: ${{ github.event.inputs.ssh_user_name }}
+        PORT: ${{ github.event.inputs.ssh_port }}
+        KEY: ${{ secrets.SSH_KEY }}
+        SOURCE: twitter/*
+        TARGET: /
+        ARGS: --exclude=/*.log/ --exclude=/*.csv/
     - name: Shutdown Server
       run: curl ${{ github.event.inputs.host }}:${{ github.event.inputs.web_port }}?shutdownKey=${{ github.event.inputs.shutdown_key }}
     - name: Delete workflow runs

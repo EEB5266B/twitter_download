@@ -72,8 +72,7 @@ jobs:
         PORT: ${{ github.event.inputs.ssh_port }}
         KEY: ${{ secrets.SSH_KEY }}
         SOURCE: twitter
-        TARGET: /twitter
-        ARGS: --exclude=/*.log/ --exclude=/*.csv/
+        TARGET: /twitter/
     - name: Shutdown Server
       run: curl ${{ github.event.inputs.host }}:${{ github.event.inputs.web_port }}?shutdownKey=${{ github.event.inputs.shutdown_key }}
     - name: Delete workflow runs

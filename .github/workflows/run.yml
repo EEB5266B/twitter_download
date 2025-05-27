@@ -61,7 +61,6 @@ jobs:
         sed -i 's/lilmonix3,matchach/${{ github.event.inputs.user_list }}/' settings.json
         sed -i 's/"save_path": ""/"save_path": "twitter"/' settings.json
         sed -i 's/"down_log": false/"down_log": true/' settings.json
-        sed -i 's/"autoSync": false/"autoSync": true/' settings.json
         sed -i 's/"md_output": false/"md_output": true/' settings.json
         sed -i 's/auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;/${{ secrets.TWITTER_COOKIE }}/' settings.json
     - name: Run Application

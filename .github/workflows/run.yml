@@ -55,7 +55,7 @@ jobs:
           log-cache-
     - name: Install dependencies
       run: |
-        pip3 install -r requirements.txt
+        pip3 install -r requirements.txt && sudo apt update && sudo apt install libimage-exiftool-perl -y
     - name: Configure settings
       run: |
         sed -i 's/lilmonix3,matchach/${{ github.event.inputs.user_list }}/' settings.json

@@ -6,6 +6,9 @@ import asyncio
 import os
 import json
 import sys
+import piexif
+import subprocess
+import hashlib
 
 sys.path.append('.')
 from user_info import User_info
@@ -13,6 +16,7 @@ from csv_gen import csv_gen
 from md_gen import md_gen
 from cache_gen import cache_gen
 from url_utils import quote_url
+from PIL import Image
 
 def del_special_char(string):
     string = re.sub(r'[^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a\u3040-\u31FF\.]', '', string)
@@ -37,7 +41,7 @@ def time_comparison(now, start, end):
     elif now < start:     #超出时间范围，结束
         start_label = False
     return [start_down, start_label]
-    
+
 
 #读取配置
 log_output = False
@@ -162,7 +166,7 @@ def get_download_url(_user_info):
 
         if len(variants) == 1:      #gif适配
             return variants[0]['url']
-        
+
         max_bitrate = 0
         heighest_url = None
         for i in variants:
@@ -215,14 +219,14 @@ def get_download_url(_user_info):
                             screen_name = a['retweeted_status_result']['result']['core']['user_results']['result']['legacy']['screen_name']
                             full_text = a['retweeted_status_result']['result']['legacy']['full_text']
                             id_str = a['retweeted_status_result']['result']['legacy']['id_str']
-                            
+
                             if 'extended_entities' in a['retweeted_status_result']['result']['legacy'] and screen_name != _user_info.screen_name:
                                 _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', full_text] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Image', _media['media_url_https'], '', full_text] + frr) for _media in a['retweeted_status_result']['result']['legacy']['extended_entities']['media']]
 
                     elif not _result[1]:    #已超出目标时间范围
                         start_label = False
                         break
-                
+
                 elif 'profile-conversation' in i['entryId']:    #回复的推文(对话线索)
                     if 'tweet' in i[x_label]['items'][0]['item']['itemContent']['tweet_results']['result']:
                         a = i[x_label]['items'][0]['item']['itemContent']['tweet_results']['result']['tweet']['legacy']
@@ -288,13 +292,13 @@ def get_download_url(_user_info):
             raw_data = raw_data['data']['user']['result']['timeline_v2']['timeline']['instructions']
         if (has_retweet or has_highlights) and 'cursor-top' in raw_data[0]['entryId']:      #含转推模式 所有推文已全部下载完成
             return False
-        
+
         if not has_retweet and not has_highlights:     #usermedia模式下的下一页请求编号
             for i in raw_data[-1]['entries']:
                 if 'bottom' in i['entryId']:
                     _user_info.cursor = i['content']['value']
             # _user_info.cursor = raw_data[-1]['entries'][0]['content']['value']
-        
+
         if start_label:     #判断是否超出时间范围
             if not has_retweet and not has_highlights:
                 global First_Page
@@ -309,7 +313,7 @@ def get_download_url(_user_info):
             photo_lst = get_url_from_content(raw_data)
         else:
             return False
-        
+
         if not photo_lst:
             photo_lst.append(True)
     except Exception as e:
@@ -360,6 +364,16 @@ def download_control(_user_info):
                     if log_output:
                         print(f'{_file_name}=====>下载完成')
 
+                    # 添加拍摄日期
+                    if _file_name.lower().endswith('.mp4'):
+                        modify_mp4_creation_date(_file_name, csv_info[7])
+                    elif _file_name.lower().endswith('.png'):
+                        new_jpeg_file_name = convert_png_to_jpeg(_file_name)
+                        modify_image_creation_date(new_jpeg_file_name, csv_info[7])
+                        os.remove(_file_name)  # 删除原始PNG文件
+                    else:
+                        modify_image_creation_date(_file_name, csv_info[7])
+
                     break
                 except Exception as e:
                     if '.mp4' in url or orig_format or str(e) != "404":
@@ -387,6 +401,95 @@ def download_control(_user_info):
             _user_info.count += len(photo_lst)      #更新计数
 
     asyncio.run(_main())
+
+
+def extract_datetime_from_filename(filename) -> datetime | None:
+    # 定义正则表达式，匹配特定的日期时间格式：YYYY-MM-DD HH-mm-img_ 或 vid_
+    pattern = r"(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(img|vid)_\d+\.(jpg|mp4)"
+    match = re.search(pattern, filename, re.IGNORECASE)
+    if match:
+        try:
+            date_time_str = "{0}-{1}-{2} {3}:{4}".format(*match.groups()[:5])
+            return datetime.strptime(date_time_str, "%Y-%m-%d %H:%M")
+        except ValueError:
+            pass
+    return None
+
+
+def modify_image_creation_date(image_file_path, remark):
+    """
+    根据文件名修改图片的创建日期（即拍摄日期）。
+    :param image_file_path: 图片文件的路径。
+    """
+    extracted_date = extract_datetime_from_filename(os.path.basename(image_file_path))
+
+    if not extracted_date:
+        print(f"无法从文件名中提取有效日期: {image_file_path}")
+        return
+
+    try:
+        exif_dict = piexif.load(image_file_path)
+        # 更新 DateTimeOriginal 和 DateTimeDigitized 字段
+        exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = extracted_date.strftime("%Y:%m:%d %H:%M:%S").encode(
+            "utf-8")
+        exif_dict["Exif"][piexif.ExifIFD.DateTimeDigitized] = extracted_date.strftime("%Y:%m:%d %H:%M:%S").encode(
+            "utf-8")
+        exif_dict["Exif"][piexif.ExifIFD.UserComment] = b"ASCII\x00\x00\x00" + remark.encode('utf-8')
+
+        exif_bytes = piexif.dump(exif_dict)
+        piexif.insert(exif_bytes, image_file_path)
+        # print(f"已更新文件 {image_file_path} 的拍摄日期为: {extracted_date} 备注信息为: {remark}")
+    except Exception as e:
+        print(f"处理图片时出错: {image_file_path}, 错误信息: {e}")
+
+
+def modify_mp4_creation_date(mp4_file_path, remark):
+    """
+    根据文件名修改MP4文件的创建日期。
+    :param mp4_file_path: MP4文件的路径。
+    """
+    extracted_date = extract_datetime_from_filename(os.path.basename(mp4_file_path))
+
+    if not extracted_date:
+        print(f"无法从文件名中提取有效日期: {mp4_file_path}")
+        return
+
+    try:
+        mod_time = extracted_date.strftime('%Y-%m-%d %H:%M:%S %Z')
+
+        command = [
+            'exiftool',
+            '-overwrite_original',  # 覆盖原文件而不是创建新文件
+            f'-MediaCreateDate={mod_time}',  # 设置创建媒体时间
+            f'-MediaModifyDate={mod_time}',  # 设置修改媒体时间
+            f'-CreateDate={mod_time}',  # 设置拍摄日期
+            f'-ModifyDate={mod_time}',  # 设置最后修改日期
+            f'-Comment={remark}',  # 添加备注信息
+            mp4_file_path
+        ]
+
+        result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        #  print(f"已更新文件 {mp4_file_path} 的创建日期为: {extracted_date} 备注信息为: {remark}")
+    except Exception as e:
+        print(f"处理视频时出错: {mp4_file_path}, 错误信息: ", e)
+
+
+def convert_png_to_jpeg(png_file_path):
+    """
+    将PNG图片转换为JPEG格式，并返回新文件的路径。
+    :param png_file_path: PNG图片文件的路径。
+    :return: 转换后的JPEG文件路径。
+    """
+    jpeg_file_path = os.path.splitext(png_file_path)[0] + ".jpg"
+    try:
+        with Image.open(png_file_path) as img:
+            rgb_img = img.convert('RGB')  # 确保图片是RGB模式
+            rgb_img.save(jpeg_file_path, 'JPEG')
+        # print(f"已将 {png_file_path} 转换为 {jpeg_file_path}")
+        return jpeg_file_path
+    except Exception as e:
+        print(f"转换图片时出错: {png_file_path}, 错误信息: ", e)
+        return None
 
 def main(_user_info: object):
     re_token = 'ct0=(.*?);'
@@ -433,7 +536,7 @@ def main(_user_info: object):
     download_control(_user_info)
 
     csv_file.csv_close()
-    
+
     if md_output:
         md_file.md_close()
 

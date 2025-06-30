@@ -1,0 +1,87 @@
+name: Run Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_list:
+        description: 'user list'
+        required: true
+        type: string
+      host:
+        description: 'host'
+        required: true
+        type: string
+      ssh_user_name:
+        description: 'user name'
+        required: true
+        type: string
+      ssh_port:
+        description: 'ssh port'
+        required: true
+      web_port:
+        description: 'web port'
+        required: true
+        type: string
+      shutdown_key:
+        description: 'shutdown key'
+        required: true
+        type: string
+
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Restore Cache Log
+      uses: actions/cache@v4
+      with:
+        path: |
+          twitter/*/*.log
+          twitter/*/*.csv
+          twitter/*/*.md
+        key: log-cache-${{ github.run_number }}
+        restore-keys: |
+          log-cache-
+    - name: Install dependencies
+      run: |
+        pip3 install -r requirements.txt && sudo apt update && sudo apt install libimage-exiftool-perl -y
+    - name: Configure settings
+      run: |
+        sed -i 's/lilmonix3,matchach/${{ github.event.inputs.user_list }}/' settings.json
+        sed -i 's/"save_path": ""/"save_path": "twitter"/' settings.json
+        sed -i 's/"down_log": false/"down_log": true/' settings.json
+        sed -i 's/"md_output": false/"md_output": true/' settings.json
+        sed -i 's/auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;/${{ secrets.TWITTER_COOKIE }}/' settings.json
+    - name: Run Application
+      run: |
+        python3 main.py
+    - name: Copy File
+      uses: up9cloud/action-rsync@master
+      env:
+        HOST: ${{ github.event.inputs.host }}
+        USER: ${{ github.event.inputs.ssh_user_name }}
+        PORT: ${{ github.event.inputs.ssh_port }}
+        KEY: ${{ secrets.SSH_KEY }}
+        SOURCE: twitter
+        TARGET: /
+        ARGS:  -avmz
+    - name: Shutdown Server
+      run: curl ${{ github.event.inputs.host }}:${{ github.event.inputs.web_port }}?shutdownKey=${{ github.event.inputs.shutdown_key }}
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 0
+        keep_minimum_runs: 3

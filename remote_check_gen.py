@@ -1,5 +1,5 @@
 import os
-import requests
+import httpx
 
 class remote_check_gen():
 
@@ -7,7 +7,7 @@ class remote_check_gen():
         url = remote_check + "api/user/" + user_name + "/media_url/list"
 
         try:
-            response = requests.get(url)
+            response = httpx.get(url)
             response.raise_for_status()  # 检查请求是否成功
             data = response.json()
             if isinstance(data, list):
@@ -15,7 +15,7 @@ class remote_check_gen():
             else:
                 print("API 返回的数据不是列表，已使用空集初始化")
                 self.remote_check_data = set()
-        except (requests.RequestException, ValueError) as e:
+        except (httpx.RequestException, ValueError) as e:
             print(f"获取 API 缓存失败: {e}，已使用空集初始化")
             self.remote_check_data = set()
 

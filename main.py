@@ -327,14 +327,15 @@ def download_control(_user_info):
     async def _main():
         async def down_save(url, prefix, csv_info, order: int):
             if '.mp4' in url:
-                _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.mp4'
+
+                _file_name = f'{_user_info.save_path + os.sep}{hashlib.md5(url.encode('utf-8')).hexdigest()}.mp4'
             else:
                 try:
                     if orig_format:
                         url += f'?name=orig'
-                        _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.{csv_info[5][-3:]}' # 根据图片 url 获取原始格式
+                        _file_name = f'{_user_info.save_path + os.sep}{hashlib.md5(url.encode('utf-8')).hexdigest()}.{csv_info[5][-3:]}' # 根据图片 url 获取原始格式
                     else: # 指定格式时，先使用 name=orig，404 则切回 name=4096x4096，以保证最大尺寸
-                        _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.{img_format}'
+                        _file_name = f'{_user_info.save_path + os.sep}{hashlib.md5(url.encode('utf-8')).hexdigest()}.{img_format}'
                         if img_format != 'png':
                             url += f'?format=jpg&name=4096x4096'
                         else:
@@ -366,13 +367,13 @@ def download_control(_user_info):
 
                     # 添加拍摄日期
                     if _file_name.lower().endswith('.mp4'):
-                        modify_mp4_creation_date(_file_name, csv_info[7])
+                        modify_mp4_creation_date(_file_name, prefix, csv_info[7])
                     elif _file_name.lower().endswith('.png'):
                         new_jpeg_file_name = convert_png_to_jpeg(_file_name)
-                        modify_image_creation_date(new_jpeg_file_name, csv_info[7])
+                        modify_image_creation_date(new_jpeg_file_name, prefix, csv_info[7])
                         os.remove(_file_name)  # 删除原始PNG文件
                     else:
-                        modify_image_creation_date(_file_name, csv_info[7])
+                        modify_image_creation_date(_file_name, prefix, csv_info[7])
 
                     break
                 except Exception as e:
@@ -405,7 +406,7 @@ def download_control(_user_info):
 
 def extract_datetime_from_filename(filename) -> datetime | None:
     # 定义正则表达式，匹配特定的日期时间格式：YYYY-MM-DD HH-mm-img_ 或 vid_
-    pattern = r"(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(img|vid)_\d+\.(jpg|mp4)"
+    pattern = r"(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(img|vid)"
     match = re.search(pattern, filename, re.IGNORECASE)
     if match:
         try:
@@ -416,15 +417,15 @@ def extract_datetime_from_filename(filename) -> datetime | None:
     return None
 
 
-def modify_image_creation_date(image_file_path, remark):
+def modify_image_creation_date(image_file_path, prefix, remark):
     """
     根据文件名修改图片的创建日期（即拍摄日期）。
     :param image_file_path: 图片文件的路径。
     """
-    extracted_date = extract_datetime_from_filename(os.path.basename(image_file_path))
+    extracted_date = extract_datetime_from_filename(prefix)
 
     if not extracted_date:
-        print(f"无法从文件名中提取有效日期: {image_file_path}")
+        print(f"无法从文件名中提取有效日期: {prefix}")
         return
 
     try:
@@ -443,15 +444,15 @@ def modify_image_creation_date(image_file_path, remark):
         print(f"处理图片时出错: {image_file_path}, 错误信息: {e}")
 
 
-def modify_mp4_creation_date(mp4_file_path, remark):
+def modify_mp4_creation_date(mp4_file_path, prefix, remark):
     """
     根据文件名修改MP4文件的创建日期。
     :param mp4_file_path: MP4文件的路径。
     """
-    extracted_date = extract_datetime_from_filename(os.path.basename(mp4_file_path))
+    extracted_date = extract_datetime_from_filename(prefix)
 
     if not extracted_date:
-        print(f"无法从文件名中提取有效日期: {mp4_file_path}")
+        print(f"无法从文件名中提取有效日期: {prefix}")
         return
 
     try:

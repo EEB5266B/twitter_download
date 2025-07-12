@@ -61,10 +61,10 @@ jobs:
         pip3 install -r requirements.txt && sudo apt update && sudo apt install libimage-exiftool-perl -y
     - name: Configure settings
       run: |
-        sed -i 's/lilmonix3,matchach/${{ github.event.inputs.user_list }}/' settings.json
-        sed -i 's/"save_path": ""/"save_path": "twitter"/' settings.json
-        sed -i 's/"remote_check": ""/"remote_check": "${{ github.event.inputs.remote_check }}"/' settings.json
-        sed -i 's/auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;/${{ secrets.TWITTER_COOKIE }}/' settings.json
+        sed -i 's!lilmonix3,matchach!${{ github.event.inputs.user_list }}!' settings.json
+        sed -i 's!"save_path": ""!"save_path": "twitter"!' settings.json
+        sed -i 's!"remote_check": ""!"remote_check": "${{ github.event.inputs.remote_check }}"!' settings.json
+        sed -i 's!auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;!${{ secrets.TWITTER_COOKIE }}!' settings.json
     - name: Run Application
       run: |
         python3 main.py

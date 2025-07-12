@@ -15,6 +15,7 @@ from user_info import User_info
 from csv_gen import csv_gen
 from md_gen import md_gen
 from cache_gen import cache_gen
+from remote_check_gen import remote_check_gen
 from url_utils import quote_url
 from PIL import Image
 
@@ -53,6 +54,7 @@ csv_file = None
 cache_data = None
 down_log = False
 autoSync = False
+remote_check = None
 
 md_file = None
 md_output = True
@@ -81,6 +83,8 @@ with open('settings.json', 'r', encoding='utf8') as f:
         autoSync = True
     if settings['down_log']:
         down_log = True
+    if settings['remote_check']:
+        remote_check = settings['remote_check']
     if settings['likes']:   #likes的逻辑和retweet大致相同
         has_retweet = True
         has_likes = True
@@ -344,7 +348,7 @@ def download_control(_user_info):
                     print(url)
                     return False
 
-            csv_info[-5] = os.path.split(_file_name)[1]
+            csv_info[-5] = os.path.split(_file_name)[1].replace(".png", ".jpg")
             if md_output: # 在下载完毕之前先输出到 Markdown，以尽可能保证高并发下载也能得到正确的推文顺序。
                 md_file.media_tweet_input(csv_info, prefix)
             count = 0
@@ -397,6 +401,8 @@ def download_control(_user_info):
             semaphore = asyncio.Semaphore(max_concurrent_requests)    #最大并发数量，默认为8，对自己网络有自信的可以调高
             if down_log:
                 await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst) if cache_data.is_present(url[0])])
+            elif remote_check is not None:
+                await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst) if remote_check_data.is_present(url[0])])
             else:
                 await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst)])
             _user_info.count += len(photo_lst)      #更新计数
@@ -516,6 +522,9 @@ def main(_user_info: object):
     if down_log:
         global cache_data
         cache_data = cache_gen(_user_info.save_path)
+    elif remote_check is not None:
+        global remote_check_data
+        remote_check_data = remote_check_gen(remote_check, _user_info.screen_name)
 
     if autoSync:
         files = sorted(os.listdir(_user_info.save_path))
@@ -543,6 +552,8 @@ def main(_user_info: object):
 
     if down_log:
         del cache_data
+    elif remote_check is not None:
+        del remote_check_data
     print(f'{_user_info.name}下载完成\n\n')
 
 if __name__=='__main__':

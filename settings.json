@@ -21,7 +21,7 @@
     "likes_info": "用户界面 [Likes] 标签页，即下载指定用户点过赞的推文，与 [媒体][转推][亮点] 不共存, 不支持时间范围限制默认全部下载(点赞时间无法获取), 不生成csv数据统计",
 
     "_emmmmmm_": "---------------",
-    
+
 
     "time_range": "1990-01-01:2030-01-01",
     "time_range_info": "时间范围限制,格式如 1990-01-01:2030-01-01 ,不填默认无限制",
@@ -31,6 +31,9 @@
 
     "autoSync": false,
     "autoSync_info": "开启后将基于本地已有的内容自动同步最新的部分, 本质上是自动调整时间范围的左半部分, 右半建议2030-01-01或更长",
+
+    "remote_check": "",
+    "remote_check_info": "远端检查已下载的内容,避免重复下载浪费带宽;",
 
     "image_format": "orig",
     "image_format_info": "可选项: orig, jpg, png; orig-(自适应原图_以推特服务器为准_大部分为jpg_少部分png), jpg-(全部以jpg格式保存), png-(全部以png格式保存_文件较大)",
@@ -46,10 +49,10 @@
 
     "proxy": "",
     "proxy_info": "手动配置代理,默认为空,非必要无需填写 格式: http://localhost:port ",
-    
+
     "md_output": false,
     "md_output_info": "开启后输出 Markdown 文件以记录获取到的推文 (不影响csv生成)",
-    
+
     "media_count_limit": 350,
     "media_count_limit_info": "限制单个md文件中包含媒体链接的数量, 默认为 350, 建议使用vscode等动态加载工具打开, 填 0 则不限制",
     "media_count_limit_info_2": "输出格式为：用户名-文件生成日期_文件计数_文件第一条推文的年月日期",

@@ -321,7 +321,7 @@ def get_download_url(_user_info):
         if not photo_lst:
             photo_lst.append(True)
     except Exception as e:
-        print('获取推文信息错误')
+        print(f'{_user_info.screen_name}获取推文信息错误')
         print(e)
         print(response)
         return False

@@ -49,13 +49,10 @@ jobs:
     - name: Restore Cache Log
       uses: actions/cache@v4
       with:
-        path: |
-          twitter/*/*.log
-          twitter/*/*.csv
-          twitter/*/*.md
-        key: log-cache-${{ github.run_number }}
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
         restore-keys: |
-          log-cache-
+          ${{ runner.os }}-pip-
     - name: Install dependencies
       run: |
         pip3 install -r requirements.txt && sudo apt update && sudo apt install libimage-exiftool-perl -y

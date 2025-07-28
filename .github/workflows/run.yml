@@ -18,17 +18,13 @@ on:
       ssh_port:
         description: 'ssh port'
         required: true
-      web_port:
-        description: 'web port'
-        required: true
-        type: string
       shutdown_key:
         description: 'shutdown key'
         required: true
         type: string
-      remote_check:
-        description: 'remote check'
-        required: false
+      twitter_next_url:
+        description: 'twitter next url'
+        required: true
         type: string
 
 permissions:
@@ -60,7 +56,7 @@ jobs:
       run: |
         sed -i 's!lilmonix3,matchach!${{ github.event.inputs.user_list }}!' settings.json
         sed -i 's!"save_path": ""!"save_path": "twitter"!' settings.json
-        sed -i 's!"remote_check": ""!"remote_check": "${{ github.event.inputs.remote_check }}"!' settings.json
+        sed -i 's!"remote_check": ""!"remote_check": "${{ github.event.inputs.twitter_next_url }}"!' settings.json
         sed -i 's!auth_token=xxxxxxxxxxx; ct0=xxxxxxxxxxx;!${{ secrets.TWITTER_COOKIE }}!' settings.json
     - name: Run Application
       run: |
@@ -74,9 +70,9 @@ jobs:
         KEY: ${{ secrets.SSH_KEY }}
         SOURCE: twitter
         TARGET: /
-        ARGS:  -avmz
+        ARGS: -avmz
     - name: Shutdown Server
-      run: curl ${{ github.event.inputs.host }}:${{ github.event.inputs.web_port }}?shutdownKey=${{ github.event.inputs.shutdown_key }}
+      run: curl ${{ github.event.inputs.twitter_next_url }}/shutdown?key=${{ github.event.inputs.shutdown_key }}
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
       with:

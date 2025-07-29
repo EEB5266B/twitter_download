@@ -68,8 +68,8 @@ jobs:
         USER: ${{ github.event.inputs.ssh_user_name }}
         PORT: ${{ github.event.inputs.ssh_port }}
         KEY: ${{ secrets.SSH_KEY }}
-        SOURCE: twitter
-        TARGET: /
+        SOURCE: twitter/
+        TARGET: /twitter-user
         ARGS: -avmz
     - name: Shutdown Server
       run: curl ${{ github.event.inputs.twitter_next_url }}/shutdown?key=${{ github.event.inputs.shutdown_key }}

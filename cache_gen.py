@@ -3,18 +3,8 @@ import pickle
 
 class cache_gen():
 
-    def __init__(self, save_path) -> None:
-        self.cache_path = save_path + os.sep + "cache_data.log"
-
-        if os.path.exists(self.cache_path):
-            with open(self.cache_path, 'rb') as f:
-                self.cache_data = pickle.load(f)
-        else:
-            self.cache_data = set()
-
-    def __del__(self):
-        with open(self.cache_path, 'wb') as f:
-            pickle.dump(self.cache_data, f)
+    def __init__(self, user_media_url) -> None:
+        self.cache_data = set(user_media_url)
 
     def add(self, element):
         self.cache_data.add(element)
@@ -25,5 +15,3 @@ class cache_gen():
         else:
             self.add(element)
             return True
-
-

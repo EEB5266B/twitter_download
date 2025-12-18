@@ -6,6 +6,9 @@ import asyncio
 import os
 import json
 import sys
+import piexif
+import subprocess
+import hashlib
 
 sys.path.append('.')
 from user_info import User_info
@@ -13,6 +16,7 @@ from csv_gen import csv_gen
 from md_gen import md_gen
 from cache_gen import cache_gen
 from url_utils import quote_url
+from PIL import Image
 
 def del_special_char(string):
     string = re.sub(r'[^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a\u3040-\u31FF\.]', '', string)
@@ -37,7 +41,7 @@ def time_comparison(now, start, end):
     elif now < start:     #超出时间范围，结束
         start_label = False
     return [start_down, start_label]
-    
+
 
 #读取配置
 log_output = False
@@ -58,6 +62,10 @@ start_time_stamp = 655028357000   #1990-10-04
 end_time_stamp = 2548484357000    #2050-10-04
 start_label = True
 First_Page = True       #首页提取内容时特殊处理
+
+with open('download_info.json', 'r', encoding='utf8') as f:
+    download_info = json.load(f)
+    f.close()
 
 with open('settings.json', 'r', encoding='utf8') as f:
     settings = json.load(f)
@@ -123,6 +131,7 @@ _headers['cookie'] = settings['cookie']
 
 request_count = 0    #请求次数计数
 down_count = 0      #下载图片数计数
+error_user = []    #错误用户
 
 def get_other_info(_user_info):
     url = 'https://twitter.com/i/api/graphql/xc8f1g7BYqr6VTzTbvNlGw/UserByScreenName?variables={"screen_name":"' + _user_info.screen_name + '","withSafetyModeUserFields":false}&features={"hidden_profile_likes_enabled":false,"hidden_profile_subscriptions_enabled":false,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"subscriptions_verification_info_verified_since_enabled":true,"highlights_tweets_tab_ui_enabled":true,"creator_subscriptions_tweet_preview_api_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"responsive_web_graphql_timeline_navigation_enabled":true}&fieldToggles={"withAuxiliaryUserLabels":false}'
@@ -136,9 +145,9 @@ def get_other_info(_user_info):
         _user_info.statuses_count = raw_data['data']['user']['result']['legacy']['statuses_count']
         _user_info.media_count = raw_data['data']['user']['result']['legacy']['media_count']
     except Exception as e:
-        print('获取信息失败')
-        print(e)
-        print(response)
+        global error_user
+        print(f'{_user_info.screen_name}获取信息失败 {e} {response}')
+        error_user.append(_user_info.screen_name)
         return False
     return True
 
@@ -162,7 +171,7 @@ def get_download_url(_user_info):
 
         if len(variants) == 1:      #gif适配
             return variants[0]['url']
-        
+
         max_bitrate = 0
         heighest_url = None
         for i in variants:
@@ -215,14 +224,14 @@ def get_download_url(_user_info):
                             screen_name = a['retweeted_status_result']['result']['core']['user_results']['result']['legacy']['screen_name']
                             full_text = a['retweeted_status_result']['result']['legacy']['full_text']
                             id_str = a['retweeted_status_result']['result']['legacy']['id_str']
-                            
+
                             if 'extended_entities' in a['retweeted_status_result']['result']['legacy'] and screen_name != _user_info.screen_name:
                                 _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', full_text] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Image', _media['media_url_https'], '', full_text] + frr) for _media in a['retweeted_status_result']['result']['legacy']['extended_entities']['media']]
 
                     elif not _result[1]:    #已超出目标时间范围
                         start_label = False
                         break
-                
+
                 elif 'profile-conversation' in i['entryId']:    #回复的推文(对话线索)
                     if 'tweet' in i[x_label]['items'][0]['item']['itemContent']['tweet_results']['result']:
                         a = i[x_label]['items'][0]['item']['itemContent']['tweet_results']['result']['tweet']['legacy']
@@ -288,13 +297,13 @@ def get_download_url(_user_info):
             raw_data = raw_data['data']['user']['result']['timeline_v2']['timeline']['instructions']
         if (has_retweet or has_highlights) and 'cursor-top' in raw_data[0]['entryId']:      #含转推模式 所有推文已全部下载完成
             return False
-        
+
         if not has_retweet and not has_highlights:     #usermedia模式下的下一页请求编号
             for i in raw_data[-1]['entries']:
                 if 'bottom' in i['entryId']:
                     _user_info.cursor = i['content']['value']
             # _user_info.cursor = raw_data[-1]['entries'][0]['content']['value']
-        
+
         if start_label:     #判断是否超出时间范围
             if not has_retweet and not has_highlights:
                 global First_Page
@@ -309,13 +318,13 @@ def get_download_url(_user_info):
             photo_lst = get_url_from_content(raw_data)
         else:
             return False
-        
+
         if not photo_lst:
             photo_lst.append(True)
     except Exception as e:
-        print('获取推文信息错误')
-        print(e)
-        print(response)
+        global error_user
+        print(f'{_user_info.screen_name}获取推文信息错误 {e} {response}')
+        error_user.append(_user_info.screen_name)
         return False
     return photo_lst
 
@@ -323,14 +332,14 @@ def download_control(_user_info):
     async def _main():
         async def down_save(url, prefix, csv_info, order: int):
             if '.mp4' in url:
-                _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.mp4'
+                _file_name = f'{_user_info.save_path + os.sep}{hashlib.md5(url.encode('utf-8')).hexdigest()}.mp4'
             else:
                 try:
                     if orig_format:
                         url += f'?name=orig'
-                        _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.{csv_info[5][-3:]}' # 根据图片 url 获取原始格式
+                        _file_name = f'{_user_info.save_path + os.sep}{hashlib.md5(url.encode('utf-8')).hexdigest()}.{csv_info[5][-3:]}' # 根据图片 url 获取原始格式
                     else: # 指定格式时，先使用 name=orig，404 则切回 name=4096x4096，以保证最大尺寸
-                        _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.{img_format}'
+                        _file_name = f'{_user_info.save_path + os.sep}{hashlib.md5(url.encode('utf-8')).hexdigest()}.{img_format}'
                         if img_format != 'png':
                             url += f'?format=jpg&name=4096x4096'
                         else:
@@ -339,7 +348,7 @@ def download_control(_user_info):
                     print(url)
                     return False
 
-            csv_info[-5] = os.path.split(_file_name)[1]
+            csv_info[-5] = os.path.split(_file_name)[1].replace(".png", ".jpg")
             if md_output: # 在下载完毕之前先输出到 Markdown，以尽可能保证高并发下载也能得到正确的推文顺序。
                 md_file.media_tweet_input(csv_info, prefix)
             count = 0
@@ -359,6 +368,16 @@ def download_control(_user_info):
 
                     if log_output:
                         print(f'{_file_name}=====>下载完成')
+
+                    # 添加拍摄日期
+                    if _file_name.lower().endswith('.mp4'):
+                        modify_mp4_creation_date(_file_name, prefix, csv_info[7])
+                    elif _file_name.lower().endswith('.png'):
+                        new_jpeg_file_name = convert_png_to_jpeg(_file_name)
+                        modify_image_creation_date(new_jpeg_file_name, prefix, csv_info[7])
+                        os.remove(_file_name)  # 删除原始PNG文件
+                    else:
+                        modify_image_creation_date(_file_name, prefix, csv_info[7])
 
                     break
                 except Exception as e:
@@ -381,14 +400,103 @@ def download_control(_user_info):
                 continue
             semaphore = asyncio.Semaphore(max_concurrent_requests)    #最大并发数量，默认为8，对自己网络有自信的可以调高
             if down_log:
-                await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst) if cache_data.is_present(url[0])])
+                await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst) if cache_data.is_present(hashlib.md5(url[0].encode('utf-8')).hexdigest())])
             else:
                 await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst)])
             _user_info.count += len(photo_lst)      #更新计数
 
     asyncio.run(_main())
 
-def main(_user_info: object):
+
+def extract_datetime_from_filename(filename) -> datetime | None:
+    # 定义正则表达式，匹配特定的日期时间格式：YYYY-MM-DD HH-mm-img_ 或 vid_
+    pattern = r"(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(img|vid)"
+    match = re.search(pattern, filename, re.IGNORECASE)
+    if match:
+        try:
+            date_time_str = "{0}-{1}-{2} {3}:{4}".format(*match.groups()[:5])
+            return datetime.strptime(date_time_str, "%Y-%m-%d %H:%M")
+        except ValueError:
+            pass
+    return None
+
+
+def modify_image_creation_date(image_file_path, prefix, remark):
+    """
+    根据文件名修改图片的创建日期（即拍摄日期）。
+    :param image_file_path: 图片文件的路径。
+    """
+    extracted_date = extract_datetime_from_filename(prefix)
+
+    if not extracted_date:
+        print(f"无法从文件名中提取有效日期: {prefix}")
+        return
+
+    try:
+        exif_dict = piexif.load(image_file_path)
+        # 更新 DateTimeOriginal 和 DateTimeDigitized 字段
+        exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = extracted_date.strftime("%Y:%m:%d %H:%M:%S").encode(
+            "utf-8")
+        exif_dict["Exif"][piexif.ExifIFD.DateTimeDigitized] = extracted_date.strftime("%Y:%m:%d %H:%M:%S").encode(
+            "utf-8")
+        exif_dict["Exif"][piexif.ExifIFD.UserComment] = b"ASCII\x00\x00\x00" + remark.encode('utf-8')
+
+        exif_bytes = piexif.dump(exif_dict)
+        piexif.insert(exif_bytes, image_file_path)
+        # print(f"已更新文件 {image_file_path} 的拍摄日期为: {extracted_date} 备注信息为: {remark}")
+    except Exception as e:
+        print(f"处理图片时出错: {image_file_path}, 错误信息: {e}")
+
+
+def modify_mp4_creation_date(mp4_file_path, prefix, remark):
+    """
+    根据文件名修改MP4文件的创建日期。
+    :param mp4_file_path: MP4文件的路径。
+    """
+    extracted_date = extract_datetime_from_filename(prefix)
+
+    if not extracted_date:
+        print(f"无法从文件名中提取有效日期: {prefix}")
+        return
+
+    try:
+        mod_time = extracted_date.strftime('%Y-%m-%d %H:%M:%S %Z')
+
+        command = [
+            'exiftool',
+            '-overwrite_original',  # 覆盖原文件而不是创建新文件
+            f'-MediaCreateDate={mod_time}',  # 设置创建媒体时间
+            f'-MediaModifyDate={mod_time}',  # 设置修改媒体时间
+            f'-CreateDate={mod_time}',  # 设置拍摄日期
+            f'-ModifyDate={mod_time}',  # 设置最后修改日期
+            f'-Comment={remark}',  # 添加备注信息
+            mp4_file_path
+        ]
+
+        result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        #  print(f"已更新文件 {mp4_file_path} 的创建日期为: {extracted_date} 备注信息为: {remark}")
+    except Exception as e:
+        print(f"处理视频时出错: {mp4_file_path}, 错误信息: ", e)
+
+
+def convert_png_to_jpeg(png_file_path):
+    """
+    将PNG图片转换为JPEG格式，并返回新文件的路径。
+    :param png_file_path: PNG图片文件的路径。
+    :return: 转换后的JPEG文件路径。
+    """
+    jpeg_file_path = os.path.splitext(png_file_path)[0] + ".jpg"
+    try:
+        with Image.open(png_file_path) as img:
+            rgb_img = img.convert('RGB')  # 确保图片是RGB模式
+            rgb_img.save(jpeg_file_path, 'JPEG')
+        # print(f"已将 {png_file_path} 转换为 {jpeg_file_path}")
+        return jpeg_file_path
+    except Exception as e:
+        print(f"转换图片时出错: {png_file_path}, 错误信息: ", e)
+        return None
+
+def main(_user_info: object, _user_media_url: object):
     re_token = 'ct0=(.*?);'
     _headers['x-csrf-token'] = re.findall(re_token,_headers['cookie'])[0]
     _headers['referer'] = 'https://twitter.com/' + _user_info.screen_name
@@ -411,7 +519,7 @@ def main(_user_info: object):
 
     if down_log:
         global cache_data
-        cache_data = cache_gen(_user_info.save_path)
+        cache_data = cache_gen(_user_media_url)
 
     if autoSync:
         files = sorted(os.listdir(_user_info.save_path))
@@ -433,7 +541,7 @@ def main(_user_info: object):
     download_control(_user_info)
 
     csv_file.csv_close()
-    
+
     if md_output:
         md_file.md_close()
 
@@ -443,8 +551,13 @@ def main(_user_info: object):
 
 if __name__=='__main__':
     _start = time.time()
-    for i in settings['user_lst'].split(','):
-        main(User_info(i))
-        start_label = True
-        First_Page = True
-    print(f'共耗时:{time.time()-_start}秒\n共调用{request_count}次API\n共下载{down_count}份图片/视频')
+    for user_list in download_info:
+        _headers['cookie'] = user_list['cookie']
+        print(f'开始使用cookie{user_list['id']}: {user_list['cookie']}')
+        for i in user_list['user_list'].split(','):
+            main(User_info(i),user_list['user_media_url'][i])
+            start_label = True
+            First_Page = True
+    print(f'共耗时:{time.time()-_start}秒\n共调用{request_count}次API\n共下载{down_count}份图片/视频\n错误用户:{",".join(error_user)}')
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as output_file:
+        output_file.write(f'error_user={",".join(error_user)}')

@@ -1,0 +1,80 @@
+name: Run Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: 'host'
+        required: true
+        type: string
+      ssh_user_name:
+        description: 'user name'
+        required: true
+        type: string
+      ssh_port:
+        description: 'ssh port'
+        required: true
+      shutdown_key:
+        description: 'shutdown key'
+        required: true
+        type: string
+      twitter_next_url:
+        description: 'twitter next url'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Restore Cache Log
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - name: Install dependencies
+      run: |
+        pip3 install -r requirements.txt && sudo apt update && sudo apt install libimage-exiftool-perl -y
+    - name: Configure settings
+      run: |
+        wget -O download_info.json ${{ github.event.inputs.twitter_next_url }}task/download/info?key=${{ github.event.inputs.shutdown_key }}
+        sed -i 's!"save_path": ""!"save_path": "twitter"!' settings.json
+        sed -i 's!"down_log": false!"down_log": true!' settings.json
+    - name: Run Application
+      id: run_application  # 这个 id 用于后续引用 outputs
+      run: |
+        python3 main.py
+    - name: Copy File
+      uses: up9cloud/action-rsync@master
+      env:
+        HOST: ${{ github.event.inputs.host }}
+        USER: ${{ github.event.inputs.ssh_user_name }}
+        PORT: ${{ github.event.inputs.ssh_port }}
+        KEY: ${{ secrets.SSH_KEY }}
+        SOURCE: twitter/
+        TARGET: /twitter-user
+        ARGS: -avmz
+    - name: Shutdown Server
+      run: |
+        echo "error_user: ${{ steps.run_application.outputs.error_user }}。"
+        curl --request GET '${{ github.event.inputs.twitter_next_url }}task/download/shutdown?key=${{ github.event.inputs.shutdown_key }}&error_user=${{ steps.run_application.outputs.error_user }}'
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 0
+        keep_minimum_runs: 3

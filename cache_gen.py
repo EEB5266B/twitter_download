@@ -6,6 +6,10 @@ class cache_gen():
     def __init__(self, user_media_url) -> None:
         self.cache_data = set(user_media_url)
 
+    def __del__(self):
+        with open(self.cache_path, 'wb') as f:
+            pickle.dump(self.cache_data, f)
+
     def add(self, element):
         self.cache_data.add(element)
 
@@ -15,3 +19,5 @@ class cache_gen():
         else:
             self.add(element)
             return True
+
+

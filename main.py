@@ -16,7 +16,7 @@ from csv_gen import csv_gen
 from md_gen import md_gen
 from cache_gen import cache_gen
 from url_utils import quote_url
-from PIL import ImageTk
+from PIL import Image, ImageTk
 
 def del_special_char(string):
     string = re.sub(r'[^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a\u3040-\u31FF\.]', '', string)

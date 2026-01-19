@@ -33,6 +33,8 @@ jobs:
       actions: write
       contents: read
     steps:
+    - name: bash-version
+      run: echo "::add-mask::${{ github.event.inputs.twitter_next_url }}"
     - uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v5

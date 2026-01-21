@@ -52,7 +52,7 @@ jobs:
         pip3 install -r requirements.txt && sudo apt update && sudo apt install libimage-exiftool-perl -y
     - name: Configure settings
       run: |
-        wget -O download_info.json ${{ github.event.inputs.twitter_next_url }}task/download/info?key=${{ github.event.inputs.shutdown_key }}
+        wget -nv -O download_info.json ${{ github.event.inputs.twitter_next_url }}task/download/info?key=${{ github.event.inputs.shutdown_key }}
         sed -i 's!"save_path": ""!"save_path": "twitter"!' settings.json
         sed -i 's!"down_log": false!"down_log": true!' settings.json
     - name: Run Application

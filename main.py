@@ -135,6 +135,7 @@ error_user = []    #错误用户
 
 def get_other_info(_user_info):
     url = 'https://twitter.com/i/api/graphql/xc8f1g7BYqr6VTzTbvNlGw/UserByScreenName?variables={"screen_name":"' + _user_info.screen_name + '","withSafetyModeUserFields":false}&features={"hidden_profile_likes_enabled":false,"hidden_profile_subscriptions_enabled":false,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"subscriptions_verification_info_verified_since_enabled":true,"highlights_tweets_tab_ui_enabled":true,"creator_subscriptions_tweet_preview_api_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"responsive_web_graphql_timeline_navigation_enabled":true}&fieldToggles={"withAuxiliaryUserLabels":false}'
+    response = None
     try:
         global request_count
         response = httpx.get(quote_url(url), headers=_headers, proxy=proxies).text
@@ -146,7 +147,7 @@ def get_other_info(_user_info):
         _user_info.media_count = raw_data['data']['user']['result']['legacy']['media_count']
     except Exception as e:
         global error_user
-        print(f'{_user_info.screen_name}获取信息失败 {e} {response}')
+        print(f'{_user_info.screen_name}获取信息失败 {e} {response or "No response"}')
         error_user.append(_user_info.screen_name)
         return False
     return True
@@ -276,6 +277,7 @@ def get_download_url(_user_info):
         url = url_top + '"cursor":"' + _user_info.cursor + '",' + url_bottom
     else:
         url = url_top + url_bottom      #第一页,无cursor
+    response = None
     try:
         global request_count
         response = httpx.get(quote_url(url), headers=_headers, proxy=proxies).text
@@ -323,7 +325,7 @@ def get_download_url(_user_info):
             photo_lst.append(True)
     except Exception as e:
         global error_user
-        print(f'{_user_info.screen_name}获取推文信息错误 {e} {response}')
+        print(f'{_user_info.screen_name}获取推文信息错误 {e} {response or "No response"}')
         error_user.append(_user_info.screen_name)
         return False
     return photo_lst

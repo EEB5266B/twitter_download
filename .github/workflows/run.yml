@@ -72,8 +72,7 @@ jobs:
     - name: Shutdown Server
       run: |
         echo "error_user: ${{ steps.run_application.outputs.error_user }}。"
-        curl --request GET '${{ github.event.inputs.twitter_next_url }}task/download/shutdown?key=${{ github.event.inputs.shutdown_key }}&error_user=${{ steps.run_application.outputs.error_user }}'
-        curl --request GET '${{ github.event.inputs.twitter_next_url }}api/tweet/repeat/clean'
+        curl -s --request GET '${{ github.event.inputs.twitter_next_url }}task/download/shutdown?key=${{ github.event.inputs.shutdown_key }}&error_user=${{ steps.run_application.outputs.error_user }}'
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
       with:

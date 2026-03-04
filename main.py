@@ -146,8 +146,10 @@ def get_other_info(_user_info):
         _user_info.statuses_count = raw_data['data']['user']['result']['legacy']['statuses_count']
         _user_info.media_count = raw_data['data']['user']['result']['legacy']['media_count']
     except Exception as e:
+        import traceback
         global error_user
         print(f'{_user_info.screen_name}获取信息失败 {e} {response or "No response"}')
+        print(traceback.format_exc())
         error_user.append(_user_info.screen_name)
         return False
     return True
@@ -285,11 +287,13 @@ def get_download_url(_user_info):
         try:
             raw_data = json.loads(response)
         except Exception:
+            import traceback
             if 'Rate limit exceeded' in response:
                 print('API次数已超限')
             else:
                 print('获取数据失败')
             print(response)
+            print(traceback.format_exc())
             return
         if has_highlights:  #亮点模式
             raw_data = raw_data['data']['user']['result']['timeline']['timeline']['instructions'][-1]['entries']
@@ -324,8 +328,10 @@ def get_download_url(_user_info):
         if not photo_lst:
             photo_lst.append(True)
     except Exception as e:
+        import traceback
         global error_user
         print(f'{_user_info.screen_name}获取推文信息错误 {e} {response or "No response"}')
+        print(traceback.format_exc())
         error_user.append(_user_info.screen_name)
         return False
     return photo_lst
@@ -447,7 +453,9 @@ def modify_image_creation_date(image_file_path, prefix, remark):
         piexif.insert(exif_bytes, image_file_path)
         # print(f"已更新文件 {image_file_path} 的拍摄日期为: {extracted_date} 备注信息为: {remark}")
     except Exception as e:
+        import traceback
         print(f"处理图片时出错: {image_file_path}, 错误信息: {e}")
+        print(traceback.format_exc())
 
 
 def modify_mp4_creation_date(mp4_file_path, prefix, remark):
@@ -478,7 +486,9 @@ def modify_mp4_creation_date(mp4_file_path, prefix, remark):
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         #  print(f"已更新文件 {mp4_file_path} 的创建日期为: {extracted_date} 备注信息为: {remark}")
     except Exception as e:
+        import traceback
         print(f"处理视频时出错: {mp4_file_path}, 错误信息: ", e)
+        print(traceback.format_exc())
 
 
 def convert_png_to_jpeg(png_file_path):
@@ -495,7 +505,9 @@ def convert_png_to_jpeg(png_file_path):
         # print(f"已将 {png_file_path} 转换为 {jpeg_file_path}")
         return jpeg_file_path
     except Exception as e:
+        import traceback
         print(f"转换图片时出错: {png_file_path}, 错误信息: ", e)
+        print(traceback.format_exc())
         return None
 
 def main(_user_info: object, _user_media_url: object):

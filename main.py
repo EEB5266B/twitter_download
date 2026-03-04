@@ -553,13 +553,26 @@ def main(_user_info: object, _user_media_url: object):
 
 if __name__=='__main__':
     _start = time.time()
-    for user_list in download_info:
-        _headers['cookie'] = user_list['cookie']
-        print(f'开始使用cookie{user_list['id']}: {user_list['cookie']}')
-        for i in user_list['user_list'].split(','):
-            main(User_info(i),user_list['user_media_url'][i])
-            start_label = True
-            First_Page = True
-    print(f'共耗时:{time.time()-_start}秒\n共调用{request_count}次API\n共下载{down_count}份图片/视频\n错误用户:{",".join(error_user)}')
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as output_file:
-        output_file.write(f'error_user={",".join(error_user)}')
+    try:
+        for user_list in download_info:
+            _headers['cookie'] = user_list['cookie']
+            print(f'开始使用cookie{user_list['id']} 下载 {user_list['user_list']}')
+            for i in user_list['user_list'].split(','):
+                try:
+                    print(f'正在处理用户：{i}')
+                    main(User_info(i),user_list['user_media_url'][i])
+                except Exception as e:
+                    import traceback
+                    print(f'用户 {i} 处理过程中发生错误：{e}')
+                    print(traceback.format_exc())
+                    error_user.append(i)
+                finally:
+                    start_label = True
+                    First_Page = True
+        print(f'共耗时:{time.time()-_start}秒\n共调用{request_count}次API\n共下载{down_count}份图片/视频\n错误用户:{",".join(error_user)}')
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output_file:
+            output_file.write(f'error_user={",".join(error_user)}')
+    except Exception as e:
+        import traceback
+        print(f'主程序发生严重错误：{e}')
+        print(traceback.format_exc())

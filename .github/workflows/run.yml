@@ -35,13 +35,13 @@ jobs:
     steps:
     - name: bash-version
       run: echo "::add-mask::${{ github.event.inputs.twitter_next_url }}"
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: "3.13"
     - name: Restore Cache Log
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}

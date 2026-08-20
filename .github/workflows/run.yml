@@ -52,7 +52,7 @@ jobs:
         pip3 install -r requirements.txt
     - name: Configure settings
       run: |
-        wget -nv --tries=3 --retry-connrefused --timeout=10 -O download_info.json ${{ inputs.twitter_next_url }}task/download/info?key=${{ inputs.shutdown_key }}
+        wget -nv --tries=3 --retry-connrefused --timeout=600 -O download_info.json ${{ inputs.twitter_next_url }}task/download/info?key=${{ inputs.shutdown_key }}
         sed -i 's!"save_path": ""!"save_path": "twitter"!' settings.json
         sed -i 's!"down_log": false!"down_log": true!' settings.json
     - name: Run Application
@@ -68,7 +68,7 @@ jobs:
         KEY: ${{ secrets.SSH_KEY }}
         SOURCE: twitter/
         TARGET: /twitter-user
-        ARGS: -avm --temp-dir=/tmp
+        ARGS: -av --temp-dir=/tmp
     - name: Shutdown Server
       run: |
         echo "error_user: ${{ steps.run_application.outputs.error_user }}。"

@@ -68,7 +68,7 @@ jobs:
         KEY: ${{ secrets.SSH_KEY }}
         SOURCE: twitter/
         TARGET: /twitter-user
-        ARGS: -avm
+        ARGS: -avm --temp-dir=/tmp
     - name: Shutdown Server
       run: |
         echo "error_user: ${{ steps.run_application.outputs.error_user }}。"

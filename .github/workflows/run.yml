@@ -33,26 +33,26 @@ jobs:
       actions: write
       contents: read
     steps:
-    - name: bash-version
-      run: echo "::add-mask::${{ github.event.inputs.twitter_next_url }}"
+    - name: Mask sensitive inputs
+      run: |
+        echo "::add-mask::${{ inputs.twitter_next_url }}"
+        echo "::add-mask::${{ inputs.shutdown_key }}"
+        echo "::add-mask::${{ inputs.ssh_user_name }}"
     - uses: actions/checkout@v7
     - name: Set up Python
       uses: actions/setup-python@v7
       with:
         python-version: "3.13"
-    - name: Restore Cache Log
-      uses: actions/cache@v6
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+        cache: 'pip'
     - name: Install dependencies
       run: |
-        pip3 install -r requirements.txt && sudo apt update && sudo apt install libimage-exiftool-perl -y
+        sudo apt-get update && \
+        sudo apt-get install -y --no-install-recommends libimage-exiftool-perl && \
+        sudo rm -rf /var/lib/apt/lists/*
+        pip3 install -r requirements.txt
     - name: Configure settings
       run: |
-        wget -nv -O download_info.json ${{ github.event.inputs.twitter_next_url }}task/download/info?key=${{ github.event.inputs.shutdown_key }}
+        wget -nv --tries=3 --retry-connrefused --timeout=10 -O download_info.json ${{ inputs.twitter_next_url }}task/download/info?key=${{ inputs.shutdown_key }}
         sed -i 's!"save_path": ""!"save_path": "twitter"!' settings.json
         sed -i 's!"down_log": false!"down_log": true!' settings.json
     - name: Run Application
@@ -62,21 +62,21 @@ jobs:
     - name: Copy File
       uses: up9cloud/action-rsync@master
       env:
-        HOST: ${{ github.event.inputs.host }}
-        USER: ${{ github.event.inputs.ssh_user_name }}
-        PORT: ${{ github.event.inputs.ssh_port }}
+        HOST: ${{ inputs.host }}
+        USER: ${{ inputs.ssh_user_name }}
+        PORT: ${{ inputs.ssh_port }}
         KEY: ${{ secrets.SSH_KEY }}
         SOURCE: twitter/
         TARGET: /twitter-user
-        ARGS: -avmz
+        ARGS: -avm
     - name: Shutdown Server
       run: |
         echo "error_user: ${{ steps.run_application.outputs.error_user }}。"
-        curl -s --request GET '${{ github.event.inputs.twitter_next_url }}task/download/shutdown?key=${{ github.event.inputs.shutdown_key }}&error_user=${{ steps.run_application.outputs.error_user }}'
+        curl -s --request GET '${{ inputs.twitter_next_url }}task/download/shutdown?key=${{ inputs.shutdown_key }}&error_user=${{ steps.run_application.outputs.error_user }}'
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
       with:
         token: ${{ github.token }}
         repository: ${{ github.repository }}
-        retain_days: 0
-        keep_minimum_runs: 3
+        retain_days: 1
+        keep_minimum_runs: 5

@@ -131,26 +131,41 @@ _headers['cookie'] = settings['cookie']
 
 request_count = 0    #请求次数计数
 down_count = 0      #下载图片数计数
-error_user = []    #错误用户
+error_user = {'unavailable': [], 'not_found': [], 'empty': [], 'other': []}    #错误用户分类
+#unavailable:用户不可用(被锁定/注销/拉黑) not_found:用户不存在(已注销/改名/拼写错误) empty:无可见媒体内容 other:未知错误
+
+def add_error_user(screen_name, category):
+    if screen_name not in error_user[category]:    #避免重复记录
+        error_user[category].append(screen_name)
 
 def get_other_info(_user_info):
+    global request_count
     url = 'https://twitter.com/i/api/graphql/xc8f1g7BYqr6VTzTbvNlGw/UserByScreenName?variables={"screen_name":"' + _user_info.screen_name + '","withSafetyModeUserFields":false}&features={"hidden_profile_likes_enabled":false,"hidden_profile_subscriptions_enabled":false,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"subscriptions_verification_info_verified_since_enabled":true,"highlights_tweets_tab_ui_enabled":true,"creator_subscriptions_tweet_preview_api_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"responsive_web_graphql_timeline_navigation_enabled":true}&fieldToggles={"withAuxiliaryUserLabels":false}'
     response = None
     try:
-        global request_count
         response = httpx.get(quote_url(url), headers=_headers, proxy=proxies).text
         request_count += 1
         raw_data = json.loads(response)
+        _user_result = raw_data.get('data', {}).get('user', {}).get('result')
+        if not _user_result:
+            #账号不存在(已注销/改名/拼写错误)
+            print(f'{_user_info.screen_name} 用户不存在(可能已注销/改名或拼写错误)')
+            add_error_user(_user_info.screen_name, 'not_found')
+            return False
+        if _user_result.get('__typename') == 'UserUnavailable':
+            #账号不可用(被锁定/注销等)
+            print(f'{_user_info.screen_name} 用户不可用(可能被锁定/注销/拉黑)')
+            add_error_user(_user_info.screen_name, 'unavailable')
+            return False
         _user_info.rest_id = raw_data['data']['user']['result']['rest_id']
         _user_info.name = raw_data['data']['user']['result']['legacy']['name']
         _user_info.statuses_count = raw_data['data']['user']['result']['legacy']['statuses_count']
         _user_info.media_count = raw_data['data']['user']['result']['legacy']['media_count']
     except Exception as e:
         import traceback
-        global error_user
         print(f'{_user_info.screen_name}获取信息失败 {e} {response or "No response"}')
         print(traceback.format_exc())
-        error_user.append(_user_info.screen_name)
+        add_error_user(_user_info.screen_name, 'other')
         return False
     return True
 
@@ -169,6 +184,7 @@ def print_info(_user_info):
     )
 
 def get_download_url(_user_info):
+    global request_count
 
     def get_heighest_video_quality(variants) -> str:   #找到最高质量的视频地址,并返回
 
@@ -281,7 +297,6 @@ def get_download_url(_user_info):
         url = url_top + url_bottom      #第一页,无cursor
     response = None
     try:
-        global request_count
         response = httpx.get(quote_url(url), headers=_headers, proxy=proxies).text
         request_count += 1
         try:
@@ -295,6 +310,12 @@ def get_download_url(_user_info):
             print(response)
             print(traceback.format_exc())
             return
+        _user_result = raw_data.get('data', {}).get('user', {}).get('result')
+        if not _user_result or _user_result.get('__typename') == 'UserUnavailable':
+            #用户资料可查询但时间线不可见(被锁定/注销/拉黑等), 重试无意义
+            print(f'{_user_info.screen_name} 用户不可用(可能被锁定/注销/拉黑), 跳过')
+            add_error_user(_user_info.screen_name, 'unavailable')
+            return False
         if has_highlights:  #亮点模式
             raw_data = raw_data['data']['user']['result']['timeline']['timeline']['instructions'][-1]['entries']
         elif has_retweet:   #与likes共用
@@ -314,7 +335,13 @@ def get_download_url(_user_info):
             if not has_retweet and not has_highlights:
                 global First_Page
                 if First_Page:   #第一页的返回值需特殊处理
-                    raw_data = raw_data[-1]['entries'][0]['content']['items']
+                    _first_entries = raw_data[-1].get('entries', [])
+                    if not _first_entries or 'items' not in _first_entries[0].get('content', {}):
+                        #时间线为空, 该用户无可见媒体内容, 正常结束(单独分类, 不算错误)
+                        print(f'{_user_info.screen_name} 无可见媒体内容, 跳过')
+                        add_error_user(_user_info.screen_name, 'empty')
+                        return False
+                    raw_data = _first_entries[0]['content']['items']
                     First_Page = False
                 else:
                     if 'moduleItems' not in raw_data[0]:    #usermedia新模式，所有推文已全部下载完成
@@ -329,10 +356,9 @@ def get_download_url(_user_info):
             photo_lst.append(True)
     except Exception as e:
         import traceback
-        global error_user
         print(f'{_user_info.screen_name}获取推文信息错误 {e} {response or "No response"}')
         print(traceback.format_exc())
-        error_user.append(_user_info.screen_name)
+        add_error_user(_user_info.screen_name, 'other')
         return False
     return photo_lst
 
@@ -577,13 +603,14 @@ if __name__=='__main__':
                     import traceback
                     print(f'用户 {i} 处理过程中发生错误：{e}')
                     print(traceback.format_exc())
-                    error_user.append(i)
+                    add_error_user(i, 'other')
                 finally:
                     start_label = True
                     First_Page = True
-        print(f'共耗时:{time.time()-_start}秒\n共调用{request_count}次API\n共下载{down_count}份图片/视频\n错误用户:{",".join(error_user)}')
+        error_user_json = json.dumps(error_user, ensure_ascii=False, separators=(',', ':'))
+        print(f'共耗时:{time.time()-_start}秒\n共调用{request_count}次API\n共下载{down_count}份图片/视频\n错误用户分类:{error_user_json}')
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output_file:
-            output_file.write(f'error_user={",".join(error_user)}')
+            output_file.write(f'error_user={error_user_json}')
     except Exception as e:
         import traceback
         print(f'主程序发生严重错误：{e}')
